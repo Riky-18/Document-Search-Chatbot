@@ -14,8 +14,12 @@ load_dotenv(_BACKEND_DIR / ".env")
 load_dotenv(_BACKEND_DIR.parent / ".env")
 
 # Model name constants
-DEFAULT_CHAT_MODEL: str = "gemini-3.8-flash"
+DEFAULT_CHAT_MODEL: str = "gemini-3.1-flash-lite"
 DEFAULT_EMBEDDING_MODEL: str = "models/gemini-embedding-2"
+
+# Thinking & token limits
+DEFAULT_THINKING_LEVEL: str = "minimal"
+DEFAULT_MAX_OUTPUT_TOKENS: int = 500
 
 # Text chunking defaults
 DEFAULT_CHUNK_SIZE: int = 800
@@ -64,6 +68,13 @@ class Settings:
     embedding_model: str = field(
         default_factory=lambda: os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL).strip()
         or DEFAULT_EMBEDDING_MODEL
+    )
+    thinking_level: str = field(
+        default_factory=lambda: os.getenv("THINKING_LEVEL", DEFAULT_THINKING_LEVEL).strip()
+        or DEFAULT_THINKING_LEVEL
+    )
+    max_output_tokens: int = field(
+        default_factory=lambda: _int_env("MAX_OUTPUT_TOKENS", DEFAULT_MAX_OUTPUT_TOKENS)
     )
     chunk_size: int = field(
         default_factory=lambda: _int_env("CHUNK_SIZE", DEFAULT_CHUNK_SIZE)
