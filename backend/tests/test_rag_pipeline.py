@@ -237,11 +237,97 @@ def test_rag_prompt_structure() -> None:
         "Mention nothing that is not in the context."
     )
     assert prompt.startswith(expected_prefix)
+    assert (
+        "After your answer, add a final line in exactly this format: "
+        "USED: followed by the numbers of the context chunks you used, comma separated (for example USED: 1,3). "
+        "If you don't know the answer, write USED: none."
+    ) in prompt
     assert "[1] (File: guide.pdf, Page: 3)" in prompt
     assert "First chunk content." in prompt
     assert "[2] (File: manual.pdf, Page: 1)" in prompt
     assert "Second chunk content." in prompt
     assert "Question: How to operate?" in prompt
+
+
+def test_used_line_parsed_and_removed(populated_manager: VectorStoreManager) -> None:
+    """Verify USED: line is parsed, filtered down to listed chunks, and stripped from answer."""
+    # populated_manager has:
+    # 1: ai_report.pdf p.1
+    # 2: ai_report.pdf p.2
+    # 3: deep_learning.pdf p.5
+    raw_response = "AI is transformative and uses deep representations.\n\nUSED: 1, 3"
+    chat_model = FakeChatModel(raw_response)
+    result = answer_question(
+        "Summarize",
+        chat_model=chat_model,
+        vector_store_manager=populated_manager,
+    )
+
+    assert result["answer"] == "AI is transformative and uses deep representations."
+    assert "USED:" not in result["answer"]
+    assert result["sources"] == [
+        {"file_name": "ai_report.pdf", "page_number": 1},
+        {"file_name": "deep_learning.pdf", "page_number": 5},
+    ]
+    # Retrieved chunks list retains all 3 chunks
+    assert len(result["retrieved"]) == 3
+
+
+def test_used_none_returns_empty_sources(populated_manager: VectorStoreManager) -> None:
+    """Verify that 'USED: none' results in an empty sources list and clean answer."""
+    raw_response = "The provided texts do not mention this topic.\n\nUSED: none"
+    chat_model = FakeChatModel(raw_response)
+    result = answer_question(
+        "Unknown query",
+        chat_model=chat_model,
+        vector_store_manager=populated_manager,
+    )
+
+    assert result["answer"] == "The provided texts do not mention this topic."
+    assert "USED:" not in result["answer"]
+    assert result["sources"] == []
+    assert len(result["retrieved"]) == 3
+
+
+def test_missing_used_line_fallback(populated_manager: VectorStoreManager) -> None:
+    """Verify missing USED line falls back to using all retrieved chunks."""
+    raw_response = "Here is an answer without a trailing USED tag."
+    chat_model = FakeChatModel(raw_response)
+    result = answer_question(
+        "AI info",
+        chat_model=chat_model,
+        vector_store_manager=populated_manager,
+    )
+
+    assert result["answer"] == "Here is an answer without a trailing USED tag."
+    # Fallback uses all retrieved chunks
+    assert len(result["sources"]) == 3
+    assert len(result["retrieved"]) == 3
+
+
+def test_malformed_used_line_fallback(populated_manager: VectorStoreManager) -> None:
+    """Verify malformed or invalid USED line falls back to using all retrieved chunks."""
+    # Out of bounds chunk index
+    raw_response_oob = "Valid answer text.\n\nUSED: 999"
+    chat_model_oob = FakeChatModel(raw_response_oob)
+    result_oob = answer_question(
+        "Query",
+        chat_model=chat_model_oob,
+        vector_store_manager=populated_manager,
+    )
+    assert len(result_oob["sources"]) == 3
+    assert "Valid answer text." in result_oob["answer"]
+
+    # Non-numeric chunk index
+    raw_response_invalid = "Another answer text.\n\nUSED: chunk1, chunk2"
+    chat_model_invalid = FakeChatModel(raw_response_invalid)
+    result_invalid = answer_question(
+        "Query",
+        chat_model=chat_model_invalid,
+        vector_store_manager=populated_manager,
+    )
+    assert len(result_invalid["sources"]) == 3
+    assert "Another answer text." in result_invalid["answer"]
 
 
 def test_chat_model_rate_limit_retry() -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Any
 
@@ -54,11 +55,66 @@ def build_rag_prompt(question: str, chunks: list[dict[str, Any]]) -> str:
     context_str = "\n\n".join(context_blocks)
     return (
         "Answer using only the context below. If the answer is not in the context, say you don't know. "
-        "Mention nothing that is not in the context.\n\n"
+        "Mention nothing that is not in the context. "
+        "After your answer, add a final line in exactly this format: USED: followed by the numbers of the context chunks you used, comma separated (for example USED: 1,3). If you don't know the answer, write USED: none.\n\n"
         f"Context:\n{context_str}\n\n"
         f"Question: {question.strip()}\n"
         "Answer:"
     )
+
+
+def parse_used_chunks(raw_answer: str, total_chunks: int) -> tuple[str, list[int] | None]:
+    """Parse and remove the final 'USED: ...' line from the model response.
+
+    Returns:
+        (cleaned_answer, used_indices):
+            - cleaned_answer: answer string with the USED line removed
+            - used_indices: list of 1-based chunk indices (empty list if 'USED: none'),
+              or None if the line is missing or unparseable (triggering fallback).
+    """
+    lines = raw_answer.splitlines()
+    last_idx = -1
+    for i in range(len(lines) - 1, -1, -1):
+        if lines[i].strip():
+            last_idx = i
+            break
+
+    if last_idx == -1:
+        return raw_answer, None
+
+    last_line = lines[last_idx].strip()
+    match = re.match(r"^USED:\s*(.*)$", last_line, re.IGNORECASE)
+    if not match:
+        return raw_answer, None
+
+    cleaned_answer = "\n".join(lines[:last_idx]).rstrip()
+    raw_val = match.group(1).strip()
+    # Strip optional trailing punctuation or brackets e.g. "none." or "[1, 2]"
+    raw_val_clean = raw_val.strip(".").strip("[]").strip()
+
+    if raw_val_clean.lower() == "none":
+        return cleaned_answer, []
+
+    if not raw_val_clean:
+        return cleaned_answer, None
+
+    parts = [p.strip() for p in raw_val_clean.split(",") if p.strip()]
+    if not parts:
+        return cleaned_answer, None
+
+    used_indices: list[int] = []
+    for p in parts:
+        try:
+            idx = int(p)
+        except ValueError:
+            return cleaned_answer, None
+        if 1 <= idx <= total_chunks:
+            if idx not in used_indices:
+                used_indices.append(idx)
+        else:
+            return cleaned_answer, None
+
+    return cleaned_answer, used_indices
 
 
 def call_chat_model_with_retry(
@@ -165,10 +221,28 @@ def answer_question(
         for chunk in chunks
     ]
 
+    # 3. Build strict RAG prompt
+    prompt = build_rag_prompt(question, chunks)
+
+    # 4. Invoke chat model with retry and timing
+    model = chat_model or get_chat_model()
+    llm_start = time.perf_counter()
+    raw_answer = call_chat_model_with_retry(model, prompt)
+    llm_seconds = round(time.perf_counter() - llm_start, 2)
+
+    # Parse and remove the USED: line from the model response
+    clean_answer, used_indices = parse_used_chunks(raw_answer, len(chunks))
+
+    # Build sources only from chunks listed, or fallback to all retrieved chunks
+    if used_indices is not None:
+        selected_chunks = [chunks[i - 1] for i in used_indices]
+    else:
+        selected_chunks = chunks
+
     # Extract, deduplicate, and sort sources
     seen_sources = set()
     sources = []
-    for chunk in chunks:
+    for chunk in selected_chunks:
         meta = chunk.get("metadata", {})
         file_name = meta.get("file_name", "unknown")
         page_number = meta.get("page_number", 1)
@@ -180,22 +254,13 @@ def answer_question(
     # Sort sources by file_name and then page_number
     sources.sort(key=lambda s: (s["file_name"], s["page_number"]))
 
-    # 3. Build strict RAG prompt
-    prompt = build_rag_prompt(question, chunks)
-
-    # 4. Invoke chat model with retry and timing
-    model = chat_model or get_chat_model()
-    llm_start = time.perf_counter()
-    answer = call_chat_model_with_retry(model, prompt)
-    llm_seconds = round(time.perf_counter() - llm_start, 2)
-
     # 6. If the model says it doesn't know, return an empty sources list (retrieved remains intact)
-    if is_dont_know_response(answer):
+    if is_dont_know_response(clean_answer):
         sources = []
 
     elapsed = round(time.perf_counter() - start_time, 2)
     return {
-        "answer": answer,
+        "answer": clean_answer,
         "sources": sources,
         "retrieved": retrieved,
         "response_time_seconds": elapsed,
