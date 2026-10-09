@@ -8,3 +8,5 @@ node_modules/
 .pytest_cache/
 cli_sample.pdf
 test_pdfs/*.pdf
+faiss_index/
+backend/faiss_index/

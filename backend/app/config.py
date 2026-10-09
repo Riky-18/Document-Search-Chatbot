@@ -14,8 +14,8 @@ load_dotenv(_BACKEND_DIR / ".env")
 load_dotenv(_BACKEND_DIR.parent / ".env")
 
 # Model name constants
-DEFAULT_CHAT_MODEL: str = "gemini-2.0-flash"
-DEFAULT_EMBEDDING_MODEL: str = "models/text-embedding-004"
+DEFAULT_CHAT_MODEL: str = "gemini-3.8-flash"
+DEFAULT_EMBEDDING_MODEL: str = "models/gemini-embedding-2"
 
 # Text chunking defaults
 DEFAULT_CHUNK_SIZE: int = 800
