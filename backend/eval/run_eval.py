@@ -40,6 +40,25 @@ REFUSAL_PHRASES = [
 ]
 
 
+def normalize(text: str) -> str:
+    """Normalize text for format-tolerant keyword matching.
+
+    - lowercase
+    - replace symbols: \\geq, \\ge, ≥, ⩾ with >= (replace \\geq before \\ge)
+    - replace symbols: \\leq, \\le, ≤, ⩽ with <=
+    - remove all whitespace, $, \\, {, and }
+    """
+    if not text:
+        return ""
+    t = text.lower()
+    t = t.replace(r"\geq", ">=").replace(r"\ge", ">=").replace("≥", ">=").replace("⩾", ">=")
+    t = t.replace(r"\leq", "<=").replace(r"\le", "<=").replace("≤", "<=").replace("⩽", "<=")
+    t = re.sub(r"\s+", "", t)
+    for ch in ("$", "\\", "{", "}"):
+        t = t.replace(ch, "")
+    return t
+
+
 def _safe_print(text: str = "") -> None:
     """Safely print text avoiding Unicode encoding crashes on Windows consoles."""
     try:
@@ -382,9 +401,10 @@ def main(argv: list[str] | None = None) -> int:
             # 2. Keyword score computed only over non-empty expected_keywords
             if exp_keywords:
                 kw_questions_count += 1
+                norm_answer = normalize(answer)
                 found_keywords = [
                     kw for kw in exp_keywords
-                    if kw.lower() in answer.lower()
+                    if normalize(kw) in norm_answer
                 ]
                 kw_score = len(found_keywords) / len(exp_keywords)
                 keyword_score_sum += kw_score

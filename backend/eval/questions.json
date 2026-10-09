@@ -4,8 +4,13 @@
     "question": "What greeting is displayed on page 1 of sample.pdf?",
     "type": "answerable",
     "expected_file": "sample.pdf",
-    "expected_pages": [1],
-    "expected_keywords": ["Welcome", "AI Chatbot backend"],
+    "expected_pages": [
+      1
+    ],
+    "expected_keywords": [
+      "Welcome",
+      "AI Chatbot backend"
+    ],
     "verified": true
   },
   {
@@ -13,8 +18,13 @@
     "question": "What does the PDF reader extract according to page 2 of sample.pdf?",
     "type": "answerable",
     "expected_file": "sample.pdf",
-    "expected_pages": [2],
-    "expected_keywords": ["clean text", "successfully"],
+    "expected_pages": [
+      2
+    ],
+    "expected_keywords": [
+      "clean text",
+      "successfully"
+    ],
     "verified": true
   },
   {
@@ -22,8 +32,12 @@
     "question": "According to the resume template, above what CGPA should a student write their grade?",
     "type": "answerable",
     "expected_file": "Fresher_Resume_Template_Kirthika_Loganathan.pdf",
-    "expected_pages": [1],
-    "expected_keywords": ["7.5"],
+    "expected_pages": [
+      1
+    ],
+    "expected_keywords": [
+      "7.5"
+    ],
     "verified": true
   },
   {
@@ -31,8 +45,12 @@
     "question": "What file naming format is recommended when exporting the resume as PDF?",
     "type": "answerable",
     "expected_file": "Fresher_Resume_Template_Kirthika_Loganathan.pdf",
-    "expected_pages": [1],
-    "expected_keywords": ["FirstName_LastName_Role.pdf"],
+    "expected_pages": [
+      1
+    ],
+    "expected_keywords": [
+      "FirstName_LastName_Role.pdf"
+    ],
     "verified": true
   },
   {
@@ -40,8 +58,13 @@
     "question": "How many soft skills does the resume template suggest listing?",
     "type": "answerable",
     "expected_file": "Fresher_Resume_Template_Kirthika_Loganathan.pdf",
-    "expected_pages": [1],
-    "expected_keywords": [],
+    "expected_pages": [
+      1
+    ],
+    "expected_keywords": [
+      "4",
+      "6"
+    ],
     "verified": true
   },
   {
@@ -49,8 +72,12 @@
     "question": "What is the contact email address listed at the top of the resume template?",
     "type": "answerable",
     "expected_file": "Fresher_Resume_Template_Kirthika_Loganathan.pdf",
-    "expected_pages": [1],
-    "expected_keywords": ["kirthiloganath@gmail.com"],
+    "expected_pages": [
+      1
+    ],
+    "expected_keywords": [
+      "kirthiloganath@gmail.com"
+    ],
     "verified": true
   },
   {
@@ -58,8 +85,12 @@
     "question": "What Google Docs link is provided for the Resume-Making Prompt document?",
     "type": "answerable",
     "expected_file": "Resume & Prompt.pdf",
-    "expected_pages": [1],
-    "expected_keywords": ["1KxJCFQKf4AIYwaxCp74t_wHSh-YI7oUaD-WX4DpU"],
+    "expected_pages": [
+      1
+    ],
+    "expected_keywords": [
+      "1KxJCFQKf4AIYwaxCp74t_wHSh-YI7oUaD-WX4DpU"
+    ],
     "verified": true
   },
   {
@@ -67,8 +98,12 @@
     "question": "Who is the author of the research paper on embeddings of derived categories into symmetric powers?",
     "type": "answerable",
     "expected_file": "2610.10708v1.pdf",
-    "expected_pages": [1],
-    "expected_keywords": ["Andreas Krug"],
+    "expected_pages": [
+      1
+    ],
+    "expected_keywords": [
+      "Andreas Krug"
+    ],
     "verified": true
   },
   {
@@ -76,8 +111,13 @@
     "question": "According to the AI Disclosure section on page 4 of the math paper, how were LLMs utilized by the author?",
     "type": "answerable",
     "expected_file": "2610.10708v1.pdf",
-    "expected_pages": [4],
-    "expected_keywords": ["discussions", "proofreading"],
+    "expected_pages": [
+      4
+    ],
+    "expected_keywords": [
+      "discussions",
+      "proofreading"
+    ],
     "verified": true
   },
   {
@@ -85,8 +125,12 @@
     "question": "What is the dimension formula for the moduli space M_C(r,e) of stable vector bundles on a curve C of genus g?",
     "type": "answerable",
     "expected_file": "2610.10708v1.pdf",
-    "expected_pages": [11],
-    "expected_keywords": ["g-1"],
+    "expected_pages": [
+      11
+    ],
+    "expected_keywords": [
+      "g-1"
+    ],
     "verified": true
   },
   {
@@ -94,8 +138,12 @@
     "question": "Under Theorem 1.1, what inequality relating n and d ensures that the functor I_n is fully faithful?",
     "type": "answerable",
     "expected_file": "2610.10708v1.pdf",
-    "expected_pages": [2],
-    "expected_keywords": [],
+    "expected_pages": [
+      2
+    ],
+    "expected_keywords": [
+      "n≥d"
+    ],
     "verified": true
   },
   {
@@ -103,8 +151,13 @@
     "question": "What is Andreas Krug's institutional affiliation and email address listed at the end of the paper?",
     "type": "answerable",
     "expected_file": "2610.10708v1.pdf",
-    "expected_pages": [24],
-    "expected_keywords": ["Hannover", "krug@math.uni-hannover.de"],
+    "expected_pages": [
+      24
+    ],
+    "expected_keywords": [
+      "Hannover",
+      "krug@math.uni-hannover.de"
+    ],
     "verified": true
   },
   {
@@ -112,8 +165,12 @@
     "question": "When considering exceptional objects in Section 4.1, what is variety M identified with?",
     "type": "answerable",
     "expected_file": "2610.10708v1.pdf",
-    "expected_pages": [8],
-    "expected_keywords": ["point"],
+    "expected_pages": [
+      8
+    ],
+    "expected_keywords": [
+      "point"
+    ],
     "verified": true
   },
   {
@@ -121,8 +178,12 @@
     "question": "According to Theorem 5.2, who proved that functors F_lambda give a semi-orthogonal decomposition of D^{S_n}(C^n)?",
     "type": "answerable",
     "expected_file": "2610.10708v1.pdf",
-    "expected_pages": [13],
-    "expected_keywords": ["PVdB"],
+    "expected_pages": [
+      13
+    ],
+    "expected_keywords": [
+      "PVdB"
+    ],
     "verified": true
   },
   {
@@ -130,8 +191,13 @@
     "question": "In the paper 2610.10708v1.pdf, in which section is the sufficiency of condition (2) proved, and in which section is its necessity proved?",
     "type": "multi",
     "expected_file": "2610.10708v1.pdf",
-    "expected_pages": [2, 20],
-    "expected_keywords": ["Section 3"],
+    "expected_pages": [
+      2,
+      20
+    ],
+    "expected_keywords": [
+      "Section 3"
+    ],
     "verified": true
   },
   {
@@ -139,7 +205,10 @@
     "question": "What is the dimension d of M when M is a curve C in Section 4.2 versus the dimension formula for moduli space M_C(r,e) in Section 5.1?",
     "type": "multi",
     "expected_file": "2610.10708v1.pdf",
-    "expected_pages": [8, 11],
+    "expected_pages": [
+      8,
+      11
+    ],
     "expected_keywords": [],
     "verified": true
   },
@@ -148,7 +217,10 @@
     "question": "How does Theorem 5.10 on page 19 extend the semi-orthogonal decomposition of Tevelev and Torres from Theorem 5.5 on page 15?",
     "type": "multi",
     "expected_file": "2610.10708v1.pdf",
-    "expected_pages": [19, 15],
+    "expected_pages": [
+      19,
+      15
+    ],
     "expected_keywords": [],
     "verified": true
   },
