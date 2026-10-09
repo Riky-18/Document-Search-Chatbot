@@ -10,3 +10,5 @@ cli_sample.pdf
 test_pdfs/*.pdf
 faiss_index/
 backend/faiss_index/
+backend/eval/results/*.json
+!backend/eval/results/.gitkeep

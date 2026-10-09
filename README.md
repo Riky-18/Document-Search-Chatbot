@@ -327,16 +327,57 @@ Open http://localhost:5173.
 
 ---
 
-## Evaluation method
+## Evaluation
 
-Answer quality is measured with a fixed set of test questions whose answers are known from the source PDFs:
+The repository includes an automated evaluation harness (`backend/eval/run_eval.py`) to systematically measure retrieval accuracy, answer fidelity, refusal behavior, and latency against ground-truth document questions.
 
-1. Write about 20 questions with known answers from a test document.
-2. Ask each one and mark the answer correct or incorrect.
-3. Accuracy = correct answers ÷ total questions.
-4. Record the average response time across all questions.
-5. Record documents, pages, and chunks indexed using the `/stats` endpoint.
-6. Repeat with different chunk sizes (for example 500, 800, and 1000) to see which scores best.
+### How to run the evaluation
+
+1. **Start the backend server** in one terminal:
+   ```powershell
+   cd backend
+   .venv\Scripts\Activate.ps1
+   uvicorn app.main:app --reload --port 8000
+   ```
+
+2. **Verify questions** in `backend/eval/questions.json`:
+   - Inspect the `expected_file`, `expected_pages`, and `expected_keywords` for each question.
+   - Flip `"verified": true` for the questions you want to score (unverified items are skipped by default).
+
+3. **Execute the evaluation harness** in a second terminal:
+   ```powershell
+   cd backend
+   .venv\Scripts\Activate.ps1
+   python eval/run_eval.py
+   ```
+   *Optional flags:*
+   - `--sleep 4.0`: Seconds to pause between queries (default 4s to avoid free-tier rate limits).
+   - `--api-url http://localhost:8000`: Backend URL.
+   - `--all`: Run all questions in `questions.json` regardless of the verified flag.
+
+### Metrics explained
+
+- **Retrieval Hit Rate:** The percentage of answerable and multi-hop questions where at least one retrieved chunk returned in `sources` matches the correct `expected_file` and one of the `expected_pages`.
+- **Keyword Answer Score:** The average percentage of ground-truth keywords found (case-insensitive) in the generated answer text for answerable and multi-hop queries.
+- **Refusal Rate (Unanswerable):** The percentage of out-of-domain / unanswerable questions where the model properly identifies that the information is absent and refuses to hallucinate (e.g., stating "I don't know" or "not mentioned in the context").
+- **Latency Breakdown:** The mean, median, and 95th-percentile (P95) of total roundtrip response time (`response_time_seconds`), along with separate mean durations for chunk retrieval (`retrieval_seconds`) and LLM generation (`llm_seconds`).
+
+### Evaluation Results (Placeholder)
+
+*Run `python eval/run_eval.py` after verifying ground-truth questions to populate these metrics.*
+
+| Metric | Target | Measured Result |
+|---|---|---|
+| **Retrieval Hit Rate** | ≥ 90% | *[Pending evaluation run]* |
+| **Keyword Answer Score** | ≥ 85% | *[Pending evaluation run]* |
+| **Refusal Rate (Unanswerable)** | 100% | *[Pending evaluation run]* |
+| **Mean Response Time** | < 3.0s | *[Pending evaluation run]* |
+| **Median Response Time** | < 2.5s | *[Pending evaluation run]* |
+| **P95 Response Time** | < 5.0s | *[Pending evaluation run]* |
+| **Mean Retrieval Time** | < 0.3s | *[Pending evaluation run]* |
+| **Mean LLM Generation Time** | < 2.5s | *[Pending evaluation run]* |
+
+Run outputs and raw query-by-query audit logs are automatically persisted to timestamped files under `backend/eval/results/results_<timestamp>.json`.
 
 ---
 

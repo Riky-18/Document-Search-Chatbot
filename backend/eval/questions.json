@@ -1,0 +1,182 @@
+[
+  {
+    "id": 1,
+    "question": "What greeting is displayed on page 1 of sample.pdf?",
+    "type": "answerable",
+    "expected_file": "sample.pdf",
+    "expected_pages": [1],
+    "expected_keywords": ["Welcome", "AI Chatbot backend"],
+    "verified": true
+  },
+  {
+    "id": 2,
+    "question": "What does the PDF reader extract according to page 2 of sample.pdf?",
+    "type": "answerable",
+    "expected_file": "sample.pdf",
+    "expected_pages": [2],
+    "expected_keywords": ["clean text", "successfully"],
+    "verified": true
+  },
+  {
+    "id": 3,
+    "question": "According to the resume template, above what CGPA should a student write their grade?",
+    "type": "answerable",
+    "expected_file": "Fresher_Resume_Template_Kirthika_Loganathan.pdf",
+    "expected_pages": [1],
+    "expected_keywords": ["7.5"],
+    "verified": true
+  },
+  {
+    "id": 4,
+    "question": "What file naming format is recommended when exporting the resume as PDF?",
+    "type": "answerable",
+    "expected_file": "Fresher_Resume_Template_Kirthika_Loganathan.pdf",
+    "expected_pages": [1],
+    "expected_keywords": ["FirstName_LastName_Role.pdf"],
+    "verified": true
+  },
+  {
+    "id": 5,
+    "question": "How many soft skills does the resume template suggest listing?",
+    "type": "answerable",
+    "expected_file": "Fresher_Resume_Template_Kirthika_Loganathan.pdf",
+    "expected_pages": [1],
+    "expected_keywords": [],
+    "verified": true
+  },
+  {
+    "id": 6,
+    "question": "What is the contact email address listed at the top of the resume template?",
+    "type": "answerable",
+    "expected_file": "Fresher_Resume_Template_Kirthika_Loganathan.pdf",
+    "expected_pages": [1],
+    "expected_keywords": ["kirthiloganath@gmail.com"],
+    "verified": true
+  },
+  {
+    "id": 7,
+    "question": "What Google Docs link is provided for the Resume-Making Prompt document?",
+    "type": "answerable",
+    "expected_file": "Resume & Prompt.pdf",
+    "expected_pages": [1],
+    "expected_keywords": ["1KxJCFQKf4AIYwaxCp74t_wHSh-YI7oUaD-WX4DpU"],
+    "verified": true
+  },
+  {
+    "id": 8,
+    "question": "Who is the author of the research paper on embeddings of derived categories into symmetric powers?",
+    "type": "answerable",
+    "expected_file": "2610.10708v1.pdf",
+    "expected_pages": [1],
+    "expected_keywords": ["Andreas Krug"],
+    "verified": true
+  },
+  {
+    "id": 9,
+    "question": "According to the AI Disclosure section on page 4 of the math paper, how were LLMs utilized by the author?",
+    "type": "answerable",
+    "expected_file": "2610.10708v1.pdf",
+    "expected_pages": [4],
+    "expected_keywords": ["discussions", "proofreading"],
+    "verified": true
+  },
+  {
+    "id": 10,
+    "question": "What is the dimension formula for the moduli space M_C(r,e) of stable vector bundles on a curve C of genus g?",
+    "type": "answerable",
+    "expected_file": "2610.10708v1.pdf",
+    "expected_pages": [11],
+    "expected_keywords": ["g-1"],
+    "verified": true
+  },
+  {
+    "id": 11,
+    "question": "Under Theorem 1.1, what inequality relating n and d ensures that the functor I_n is fully faithful?",
+    "type": "answerable",
+    "expected_file": "2610.10708v1.pdf",
+    "expected_pages": [2],
+    "expected_keywords": [],
+    "verified": true
+  },
+  {
+    "id": 12,
+    "question": "What is Andreas Krug's institutional affiliation and email address listed at the end of the paper?",
+    "type": "answerable",
+    "expected_file": "2610.10708v1.pdf",
+    "expected_pages": [24],
+    "expected_keywords": ["Hannover", "krug@math.uni-hannover.de"],
+    "verified": true
+  },
+  {
+    "id": 13,
+    "question": "When considering exceptional objects in Section 4.1, what is variety M identified with?",
+    "type": "answerable",
+    "expected_file": "2610.10708v1.pdf",
+    "expected_pages": [8],
+    "expected_keywords": ["point"],
+    "verified": true
+  },
+  {
+    "id": 14,
+    "question": "According to Theorem 5.2, who proved that functors F_lambda give a semi-orthogonal decomposition of D^{S_n}(C^n)?",
+    "type": "answerable",
+    "expected_file": "2610.10708v1.pdf",
+    "expected_pages": [13],
+    "expected_keywords": ["PVdB"],
+    "verified": true
+  },
+  {
+    "id": 15,
+    "question": "In the paper 2610.10708v1.pdf, in which section is the sufficiency of condition (2) proved, and in which section is its necessity proved?",
+    "type": "multi",
+    "expected_file": "2610.10708v1.pdf",
+    "expected_pages": [2, 20],
+    "expected_keywords": ["Section 3"],
+    "verified": true
+  },
+  {
+    "id": 16,
+    "question": "What is the dimension d of M when M is a curve C in Section 4.2 versus the dimension formula for moduli space M_C(r,e) in Section 5.1?",
+    "type": "multi",
+    "expected_file": "2610.10708v1.pdf",
+    "expected_pages": [8, 11],
+    "expected_keywords": [],
+    "verified": true
+  },
+  {
+    "id": 17,
+    "question": "How does Theorem 5.10 on page 19 extend the semi-orthogonal decomposition of Tevelev and Torres from Theorem 5.5 on page 15?",
+    "type": "multi",
+    "expected_file": "2610.10708v1.pdf",
+    "expected_pages": [19, 15],
+    "expected_keywords": [],
+    "verified": true
+  },
+  {
+    "id": 18,
+    "question": "What was Apple's total net sales revenue in US dollars for fiscal year 2024?",
+    "type": "unanswerable",
+    "expected_file": "",
+    "expected_pages": [],
+    "expected_keywords": [],
+    "verified": true
+  },
+  {
+    "id": 19,
+    "question": "How many broker nodes are required to set up a production Apache Kafka cluster with high availability?",
+    "type": "unanswerable",
+    "expected_file": "",
+    "expected_pages": [],
+    "expected_keywords": [],
+    "verified": true
+  },
+  {
+    "id": 20,
+    "question": "What are the rules and restrictions for performing castling in a standard game of chess?",
+    "type": "unanswerable",
+    "expected_file": "",
+    "expected_pages": [],
+    "expected_keywords": [],
+    "verified": true
+  }
+]

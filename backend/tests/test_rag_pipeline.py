@@ -106,6 +106,7 @@ def test_nothing_indexed(empty_manager: VectorStoreManager) -> None:
     assert chat_model.call_count == 0  # LLM must not be called
     assert "No documents are currently indexed" in result["answer"]
     assert result["sources"] == []
+    assert result["retrieved"] == []
     assert isinstance(result["response_time_seconds"], float)
     assert result["retrieval_seconds"] == 0.0
     assert result["llm_seconds"] == 0.0
@@ -123,11 +124,17 @@ def test_normal_answer_with_sources(populated_manager: VectorStoreManager) -> No
     assert chat_model.call_count == 1
     assert result["answer"] == "AI is transformative and includes machine learning."
     assert len(result["sources"]) > 0
+    assert len(result["retrieved"]) > 0
 
     # Ensure sources have file_name and page_number
     for s in result["sources"]:
         assert "file_name" in s
         assert "page_number" in s
+
+    # Ensure retrieved chunks have file_name and page_number
+    for r in result["retrieved"]:
+        assert "file_name" in r
+        assert "page_number" in r
 
     # Ensure sources are sorted
     sorted_sources = sorted(result["sources"], key=lambda x: (x["file_name"], x["page_number"]))
@@ -170,10 +177,12 @@ def test_duplicate_sources_removed(fake_embeddings: FakeEmbeddings, tmp_path: Pa
         {"file_name": "doc.pdf", "page_number": 1},
         {"file_name": "doc.pdf", "page_number": 2},
     ]
+    # retrieved retains all 4 chunks
+    assert len(result["retrieved"]) == 4
 
 
 def test_dont_know_returns_empty_sources(populated_manager: VectorStoreManager) -> None:
-    """Verify that if the model says it doesn't know, an empty sources list is returned."""
+    """Verify that if model doesn't know, sources is empty but retrieved keeps all chunks."""
     chat_model = FakeChatModel("I don't know. The provided documents do not contain this information.")
     result = answer_question(
         "Who founded the company?",
@@ -183,6 +192,30 @@ def test_dont_know_returns_empty_sources(populated_manager: VectorStoreManager) 
 
     assert "I don't know" in result["answer"]
     assert result["sources"] == []
+    # retrieved keeps the chunks sent to LLM even on 'I don't know'
+    assert len(result["retrieved"]) > 0
+    assert all("file_name" in r and "page_number" in r for r in result["retrieved"])
+
+
+def test_top_k_configurable(populated_manager: VectorStoreManager) -> None:
+    """Verify top_k retrieval count is configurable."""
+    chat_model = FakeChatModel("Sample response.")
+    # Request top_k = 2
+    result_k2 = answer_question(
+        "AI topics",
+        chat_model=chat_model,
+        vector_store_manager=populated_manager,
+        top_k=2,
+    )
+    assert len(result_k2["retrieved"]) == 2
+
+    # Request default (populated_manager has 3 chunks total)
+    result_default = answer_question(
+        "AI topics",
+        chat_model=chat_model,
+        vector_store_manager=populated_manager,
+    )
+    assert len(result_default["retrieved"]) == 3
 
 
 def test_rag_prompt_structure() -> None:

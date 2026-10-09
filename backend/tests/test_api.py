@@ -135,12 +135,13 @@ def test_ask_with_nothing_indexed(client: TestClient) -> None:
     data = resp.json()
     assert "No documents are currently indexed" in data["answer"]
     assert data["sources"] == []
+    assert data["retrieved"] == []
     assert "retrieval_seconds" in data
     assert "llm_seconds" in data
 
 
 def test_ask_with_indexed_content(client: TestClient) -> None:
-    """POST /ask successfully answers using context and returns sources."""
+    """POST /ask successfully answers using context and returns sources and retrieved chunks."""
     pdf_bytes = build_simple_pdf(["Documentation on python and fastapi framework."])
     files = {"file": ("fastapi_guide.pdf", io.BytesIO(pdf_bytes), "application/pdf")}
     upload_resp = client.post("/upload", files=files)
@@ -153,10 +154,13 @@ def test_ask_with_indexed_content(client: TestClient) -> None:
     assert len(data["sources"]) > 0
     assert data["sources"][0]["file_name"] == "fastapi_guide.pdf"
     assert data["sources"][0]["page_number"] == 1
+    assert len(data["retrieved"]) > 0
+    assert data["retrieved"][0]["file_name"] == "fastapi_guide.pdf"
+    assert data["retrieved"][0]["page_number"] == 1
 
 
 def test_stats_and_clear(client: TestClient) -> None:
-    """GET /stats reports accurate counts and POST /clear resets them."""
+    """GET /stats reports accurate counts, top_k, and POST /clear resets them."""
     # Upload a document
     pdf_bytes = build_simple_pdf(["Page 1", "Page 2"])
     files = {"file": ("stats_test.pdf", io.BytesIO(pdf_bytes), "application/pdf")}
@@ -170,6 +174,7 @@ def test_stats_and_clear(client: TestClient) -> None:
     assert stats["pages"] == 2
     assert stats["chunks"] == 2
     assert "stats_test.pdf" in stats["files"]
+    assert stats["top_k"] == 4
 
     # Clear
     clear_resp = client.post("/clear")
@@ -182,3 +187,4 @@ def test_stats_and_clear(client: TestClient) -> None:
     assert empty_stats["pages"] == 0
     assert empty_stats["chunks"] == 0
     assert empty_stats["files"] == []
+    assert empty_stats["top_k"] == 4

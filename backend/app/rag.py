@@ -6,6 +6,7 @@ import logging
 import time
 from typing import Any
 
+from app.config import settings
 from app.providers import get_chat_model
 from app.vector_store import (
     VectorStoreManager,
@@ -101,7 +102,7 @@ def answer_question(
     question: str,
     chat_model: Any | None = None,
     vector_store_manager: VectorStoreManager | None = None,
-    top_k: int = 4,
+    top_k: int | None = None,
 ) -> dict[str, Any]:
     """Generate an answer using only retrieved context chunks.
 
@@ -109,18 +110,20 @@ def answer_question(
         question: User query string.
         chat_model: Optional chat model override (defaults to providers.get_chat_model()).
         vector_store_manager: Optional VectorStoreManager override.
-        top_k: Number of context chunks to retrieve (default: 4).
+        top_k: Number of context chunks to retrieve (default: settings.top_k).
 
     Returns:
         dict: {
             "answer": str,
             "sources": [{"file_name": str, "page_number": int}],
+            "retrieved": [{"file_name": str, "page_number": int}],
             "response_time_seconds": float,
             "retrieval_seconds": float,
             "llm_seconds": float,
         }
     """
     start_time = time.perf_counter()
+    effective_top_k = top_k if top_k is not None else settings.top_k
 
     # 1. Check if vector store has any indexed documents
     vm = vector_store_manager or get_vector_store_manager()
@@ -130,6 +133,7 @@ def answer_question(
         return {
             "answer": "No documents are currently indexed. Please upload or index a PDF first.",
             "sources": [],
+            "retrieved": [],
             "response_time_seconds": elapsed,
             "retrieval_seconds": 0.0,
             "llm_seconds": 0.0,
@@ -138,7 +142,7 @@ def answer_question(
     # 2. Retrieve relevant context chunks with timing
     search_func = vm.search if vector_store_manager else search
     retrieval_start = time.perf_counter()
-    chunks = search_func(question, k=top_k)
+    chunks = search_func(question, k=effective_top_k)
     retrieval_seconds = round(time.perf_counter() - retrieval_start, 2)
 
     if not chunks:
@@ -146,10 +150,20 @@ def answer_question(
         return {
             "answer": "I don't know. No relevant information was found in the indexed documents.",
             "sources": [],
+            "retrieved": [],
             "response_time_seconds": elapsed,
             "retrieval_seconds": retrieval_seconds,
             "llm_seconds": 0.0,
         }
+
+    # List of EVERY chunk retrieved and sent to the LLM
+    retrieved = [
+        {
+            "file_name": chunk.get("metadata", {}).get("file_name", "unknown"),
+            "page_number": chunk.get("metadata", {}).get("page_number", 1),
+        }
+        for chunk in chunks
+    ]
 
     # Extract, deduplicate, and sort sources
     seen_sources = set()
@@ -175,7 +189,7 @@ def answer_question(
     answer = call_chat_model_with_retry(model, prompt)
     llm_seconds = round(time.perf_counter() - llm_start, 2)
 
-    # 6. If the model says it doesn't know, return an empty sources list
+    # 6. If the model says it doesn't know, return an empty sources list (retrieved remains intact)
     if is_dont_know_response(answer):
         sources = []
 
@@ -183,6 +197,7 @@ def answer_question(
     return {
         "answer": answer,
         "sources": sources,
+        "retrieved": retrieved,
         "response_time_seconds": elapsed,
         "retrieval_seconds": retrieval_seconds,
         "llm_seconds": llm_seconds,

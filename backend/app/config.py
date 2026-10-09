@@ -25,6 +25,9 @@ DEFAULT_MAX_OUTPUT_TOKENS: int = 500
 DEFAULT_CHUNK_SIZE: int = 800
 DEFAULT_CHUNK_OVERLAP: int = 100
 
+# Retrieval defaults
+DEFAULT_TOP_K: int = 4
+
 # CORS / Origin defaults
 DEFAULT_ALLOWED_ORIGINS: list[str] = ["http://localhost:5173"]
 
@@ -81,6 +84,9 @@ class Settings:
     )
     chunk_overlap: int = field(
         default_factory=lambda: _int_env("CHUNK_OVERLAP", DEFAULT_CHUNK_OVERLAP)
+    )
+    top_k: int = field(
+        default_factory=lambda: _int_env("TOP_K", DEFAULT_TOP_K)
     )
     _gemini_api_key: str | None = field(
         default_factory=lambda: os.getenv("GEMINI_API_KEY"),

@@ -80,6 +80,8 @@ class SourceItem(BaseModel):
 class AskResponse(BaseModel):
     answer: str = Field(description="Generated answer from context")
     sources: list[SourceItem] = Field(description="Deduplicated and sorted sources")
+    retrieved: list[SourceItem] = Field(default_factory=list, description="Every chunk retrieved and sent to LLM")
+    top_k: int = Field(default=settings.top_k, description="Configured top_k retrieval chunk count")
     response_time_seconds: float = Field(description="Total roundtrip response time in seconds")
     retrieval_seconds: float = Field(description="Context retrieval duration in seconds")
     llm_seconds: float = Field(description="LLM generation duration in seconds")
@@ -90,6 +92,7 @@ class StatsResponse(BaseModel):
     pages: int = Field(description="Count of unique indexed pages")
     chunks: int = Field(description="Total chunks in the vector index")
     files: list[str] = Field(description="List of indexed file names")
+    top_k: int = Field(default=settings.top_k, description="Configured top_k retrieval chunk count")
 
 
 class ClearResponse(BaseModel):
@@ -113,6 +116,7 @@ def stats() -> dict[str, Any]:
         "pages": index_stats.get("pages", 0),
         "chunks": index_stats.get("chunks", 0),
         "files": indexed_files,
+        "top_k": settings.top_k,
     }
 
 
@@ -227,7 +231,9 @@ def ask(request: AskRequest) -> dict[str, Any]:
         )
 
     try:
-        return answer_question(question)
+        res = answer_question(question)
+        res["top_k"] = settings.top_k
+        return res
     except HTTPException:
         raise
     except Exception as exc:
