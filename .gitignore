@@ -1,0 +1,10 @@
+.env
+.venv/
+venv/
+__pycache__/
+node_modules/
+*.faiss
+*.pkl
+.pytest_cache/
+cli_sample.pdf
+test_pdfs/*.pdf
