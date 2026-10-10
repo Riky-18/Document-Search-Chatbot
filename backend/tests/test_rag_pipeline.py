@@ -20,16 +20,37 @@ from app.vector_store import VectorStoreManager
 class FakeChatModel:
     """Deterministic offline fake chat model for unit testing."""
 
-    def __init__(self, response_text: str = "This is a test answer.") -> None:
-        self.response_text = response_text
+    def __init__(self, response_text: str | list[str] = "This is a test answer.") -> None:
+        self.responses = [response_text] if isinstance(response_text, str) else list(response_text)
         self.call_count = 0
         self.last_prompt = ""
+        self.prompts: list[str] = []
 
     def invoke(self, prompt: str) -> MagicMock:
         self.call_count += 1
         self.last_prompt = prompt
+        self.prompts.append(prompt)
+        resp_str = self.responses[min(self.call_count - 1, len(self.responses) - 1)]
         mock_response = MagicMock()
-        mock_response.content = self.response_text
+        mock_response.content = resp_str
+        return mock_response
+
+
+class FailingFirstCallChatModel:
+    """Chat model that fails on its first invocation (e.g. rewrite) then succeeds."""
+
+    def __init__(self, final_text: str = "Fallback final answer.") -> None:
+        self.final_text = final_text
+        self.call_count = 0
+        self.prompts: list[str] = []
+
+    def invoke(self, prompt: str) -> MagicMock:
+        self.call_count += 1
+        self.prompts.append(prompt)
+        if self.call_count == 1:
+            raise RuntimeError("Rewrite service temporary failure")
+        mock_response = MagicMock()
+        mock_response.content = self.final_text
         return mock_response
 
 
@@ -251,10 +272,6 @@ def test_rag_prompt_structure() -> None:
 
 def test_used_line_parsed_and_removed(populated_manager: VectorStoreManager) -> None:
     """Verify USED: line is parsed, filtered down to listed chunks, and stripped from answer."""
-    # populated_manager has:
-    # 1: ai_report.pdf p.1
-    # 2: ai_report.pdf p.2
-    # 3: deep_learning.pdf p.5
     raw_response = "AI is transformative and uses deep representations.\n\nUSED: 1, 3"
     chat_model = FakeChatModel(raw_response)
     result = answer_question(
@@ -263,12 +280,18 @@ def test_used_line_parsed_and_removed(populated_manager: VectorStoreManager) -> 
         vector_store_manager=populated_manager,
     )
 
+    # Chunks passed to LLM as [1] and [3] are result["retrieved"][0] and result["retrieved"][2]
+    expected_sources = sorted(
+        [
+            result["retrieved"][0],
+            result["retrieved"][2],
+        ],
+        key=lambda s: (s["file_name"], s["page_number"]),
+    )
+
     assert result["answer"] == "AI is transformative and uses deep representations."
     assert "USED:" not in result["answer"]
-    assert result["sources"] == [
-        {"file_name": "ai_report.pdf", "page_number": 1},
-        {"file_name": "deep_learning.pdf", "page_number": 5},
-    ]
+    assert result["sources"] == expected_sources
     # Retrieved chunks list retains all 3 chunks
     assert len(result["retrieved"]) == 3
 
@@ -359,3 +382,86 @@ def test_chat_model_provider_configuration(monkeypatch: pytest.MonkeyPatch) -> N
     assert DEFAULT_MAX_OUTPUT_TOKENS == 500
     assert model.thinking_level == "minimal"
     assert model.max_output_tokens == 500
+
+
+def test_no_history_behaves_as_before(populated_manager: VectorStoreManager) -> None:
+    """Verify that when history is None or empty, pipeline behaves exactly as before."""
+    chat_model = FakeChatModel("Answer without history.")
+    result = answer_question(
+        "Explain AI",
+        chat_model=chat_model,
+        vector_store_manager=populated_manager,
+        history=None,
+    )
+
+    assert chat_model.call_count == 1
+    assert "standalone_question" not in result
+    assert "rewrite_seconds" not in result
+    assert "Conversation so far:" not in chat_model.last_prompt
+    assert result["answer"] == "Answer without history."
+
+
+def test_history_triggers_rewrite(populated_manager: VectorStoreManager) -> None:
+    """Verify that non-empty history triggers follow-up question rewrite."""
+    history = [{"question": "What is AI?", "answer": "Artificial intelligence."}]
+    chat_model = FakeChatModel([
+        "What is the transformative impact of AI?",
+        "AI transforms various industries.\n\nUSED: 1",
+    ])
+    result = answer_question(
+        "What is its impact?",
+        chat_model=chat_model,
+        vector_store_manager=populated_manager,
+        history=history,
+    )
+
+    assert chat_model.call_count == 2
+    assert result["standalone_question"] == "What is the transformative impact of AI?"
+    assert "rewrite_seconds" in result
+    assert isinstance(result["rewrite_seconds"], float)
+    assert "Conversation so far:" in chat_model.last_prompt
+    assert "Question: What is AI?" in chat_model.last_prompt
+    assert "Answer: Artificial intelligence." in chat_model.last_prompt
+
+
+def test_rewritten_question_is_the_one_searched(populated_manager: VectorStoreManager) -> None:
+    """Verify that the rewritten standalone question is used for vector store search."""
+    search_spy = MagicMock(wraps=populated_manager.search)
+    populated_manager.search = search_spy
+
+    history = [{"question": "What is neural network?", "answer": "Layered processing."}]
+    chat_model = FakeChatModel([
+        "How do neural networks process layered representations?",
+        "Through interconnected layers.\n\nUSED: 1",
+    ])
+    answer_question(
+        "How do they process things?",
+        chat_model=chat_model,
+        vector_store_manager=populated_manager,
+        history=history,
+    )
+
+    search_spy.assert_called_once()
+    searched_query = search_spy.call_args[0][0]
+    assert searched_query == "How do neural networks process layered representations?"
+
+
+def test_rewrite_failure_falls_back_to_original(populated_manager: VectorStoreManager) -> None:
+    """Verify that when rewrite fails, it falls back to the original question."""
+    search_spy = MagicMock(wraps=populated_manager.search)
+    populated_manager.search = search_spy
+
+    history = [{"question": "Q1", "answer": "A1"}]
+    failing_model = FailingFirstCallChatModel("Final answer using fallback.\n\nUSED: 1")
+
+    result = answer_question(
+        "Original question fallback",
+        chat_model=failing_model,
+        vector_store_manager=populated_manager,
+        history=history,
+    )
+
+    assert failing_model.call_count == 2
+    assert result["standalone_question"] == "Original question fallback"
+    assert search_spy.call_args[0][0] == "Original question fallback"
+    assert "Final answer using fallback." in result["answer"]

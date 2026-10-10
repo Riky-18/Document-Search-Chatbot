@@ -68,8 +68,14 @@ class UploadResponse(BaseModel):
     chunks: int = Field(description="Total chunks generated and stored")
 
 
+class HistoryTurn(BaseModel):
+    question: str = Field(description="User question in the turn")
+    answer: str = Field(description="Assistant answer in the turn")
+
+
 class AskRequest(BaseModel):
     question: str = Field(description="User question to answer against indexed documents")
+    history: list[HistoryTurn] | None = Field(default=None, description="Optional recent conversation turns")
 
 
 class SourceItem(BaseModel):
@@ -85,6 +91,8 @@ class AskResponse(BaseModel):
     response_time_seconds: float = Field(description="Total roundtrip response time in seconds")
     retrieval_seconds: float = Field(description="Context retrieval duration in seconds")
     llm_seconds: float = Field(description="LLM generation duration in seconds")
+    rewrite_seconds: float | None = Field(default=None, description="Question rewrite duration in seconds")
+    standalone_question: str | None = Field(default=None, description="Rewritten standalone question when history was used")
 
 
 class StatsResponse(BaseModel):
@@ -222,7 +230,7 @@ def upload(file: UploadFile = File(...)) -> dict[str, Any]:
 
 @app.post("/ask", response_model=AskResponse, tags=["Q&A"])
 def ask(request: AskRequest) -> dict[str, Any]:
-    """Answer a question based on indexed PDF documents."""
+    """Answer a question based on indexed PDF documents with optional history."""
     question = request.question.strip() if request.question else ""
     if not question:
         raise HTTPException(
@@ -230,8 +238,21 @@ def ask(request: AskRequest) -> dict[str, Any]:
             detail="Question cannot be empty or contain only whitespace.",
         )
 
+    if request.history is not None and len(request.history) > 6:
+        raise HTTPException(
+            status_code=422,
+            detail="History cannot exceed 6 turns.",
+        )
+
+    sanitized_history = None
+    if request.history:
+        sanitized_history = [
+            {"question": turn.question, "answer": turn.answer[:600]}
+            for turn in request.history
+        ]
+
     try:
-        res = answer_question(question)
+        res = answer_question(question, history=sanitized_history)
         res["top_k"] = settings.top_k
         return res
     except HTTPException:

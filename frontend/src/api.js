@@ -66,17 +66,23 @@ export async function uploadPdf(file) {
 }
 
 /**
- * Ask a question against the indexed documents.
+ * Ask a question against the indexed documents with optional conversation history.
  * @param {string} question
- * @returns {Promise<{answer: string, sources: Array<{file_name: string, page_number: number}>, response_time_seconds: number, retrieval_seconds: number, llm_seconds: number}>}
+ * @param {Array<{question: string, answer: string}>} [history]
+ * @returns {Promise<{answer: string, sources: Array<{file_name: string, page_number: number}>, response_time_seconds: number, retrieval_seconds: number, llm_seconds: number, rewrite_seconds?: number, standalone_question?: string}>}
  */
-export async function askQuestion(question) {
+export async function askQuestion(question, history = []) {
+  const payload = { question };
+  if (Array.isArray(history) && history.length > 0) {
+    payload.history = history;
+  }
+
   return request('/ask', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify(payload),
   });
 }
 

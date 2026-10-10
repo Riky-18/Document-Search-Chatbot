@@ -126,6 +126,14 @@ def test_empty_question_rejected(client: TestClient) -> None:
     assert "empty" in resp.json()["detail"].lower()
 
 
+def test_ask_history_exceeding_six_turns_rejected(client: TestClient) -> None:
+    """POST /ask rejects history with more than 6 turns with 422."""
+    turns = [{"question": f"Question {i}", "answer": f"Answer {i}"} for i in range(7)]
+    resp = client.post("/ask", json={"question": "What is next?", "history": turns})
+    assert resp.status_code == 422
+    assert "6 turns" in resp.json()["detail"].lower()
+
+
 def test_ask_with_nothing_indexed(client: TestClient) -> None:
     """POST /ask when nothing is indexed returns message without calling LLM."""
     client.post("/clear")  # Ensure clean slate

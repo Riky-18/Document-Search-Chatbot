@@ -42,8 +42,35 @@ def is_dont_know_response(answer: str) -> bool:
     return any(pattern in normalized for pattern in DONT_KNOW_PATTERNS)
 
 
-def build_rag_prompt(question: str, chunks: list[dict[str, Any]]) -> str:
-    """Build the strict RAG prompt with numbered context chunks."""
+REWRITE_INSTRUCTION = (
+    "Rewrite the follow-up question so it can be understood without the conversation. "
+    "Replace pronouns and references like 'that' or 'it' with what they refer to. "
+    "If it is already standalone, return it unchanged. Return only the rewritten question."
+)
+
+
+def build_rewrite_prompt(question: str, history: list[dict[str, str]]) -> str:
+    """Build the prompt for rewriting follow-up questions using history."""
+    conv_lines = []
+    for turn in history:
+        q = turn.get("question", "").strip()
+        a = turn.get("answer", "").strip()
+        conv_lines.append(f"Question: {q}\nAnswer: {a}")
+    conv_str = "\n\n".join(conv_lines)
+    return (
+        f"{REWRITE_INSTRUCTION}\n\n"
+        f"Conversation so far:\n{conv_str}\n\n"
+        f"Follow-up question: {question.strip()}\n"
+        "Rewritten question:"
+    )
+
+
+def build_rag_prompt(
+    question: str,
+    chunks: list[dict[str, Any]],
+    history: list[dict[str, str]] | None = None,
+) -> str:
+    """Build the strict RAG prompt with numbered context chunks and optional history."""
     context_blocks = []
     for i, chunk in enumerate(chunks, start=1):
         meta = chunk.get("metadata", {})
@@ -53,10 +80,21 @@ def build_rag_prompt(question: str, chunks: list[dict[str, Any]]) -> str:
         context_blocks.append(f"[{i}] (File: {file_name}, Page: {page_number})\n{text}")
 
     context_str = "\n\n".join(context_blocks)
+
+    conversation_block = ""
+    if history:
+        conv_lines = []
+        for turn in history:
+            q = turn.get("question", "").strip()
+            a = turn.get("answer", "").strip()
+            conv_lines.append(f"Question: {q}\nAnswer: {a}")
+        conversation_block = "Conversation so far:\n" + "\n\n".join(conv_lines) + "\n\n"
+
     return (
         "Answer using only the context below. If the answer is not in the context, say you don't know. "
         "Mention nothing that is not in the context. "
         "After your answer, add a final line in exactly this format: USED: followed by the numbers of the context chunks you used, comma separated (for example USED: 1,3). If you don't know the answer, write USED: none.\n\n"
+        f"{conversation_block}"
         f"Context:\n{context_str}\n\n"
         f"Question: {question.strip()}\n"
         "Answer:"
@@ -159,6 +197,7 @@ def answer_question(
     chat_model: Any | None = None,
     vector_store_manager: VectorStoreManager | None = None,
     top_k: int | None = None,
+    history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Generate an answer using only retrieved context chunks.
 
@@ -167,6 +206,7 @@ def answer_question(
         chat_model: Optional chat model override (defaults to providers.get_chat_model()).
         vector_store_manager: Optional VectorStoreManager override.
         top_k: Number of context chunks to retrieve (default: settings.top_k).
+        history: Optional list of recent turns [{"question": str, "answer": str}].
 
     Returns:
         dict: {
@@ -176,17 +216,20 @@ def answer_question(
             "response_time_seconds": float,
             "retrieval_seconds": float,
             "llm_seconds": float,
+            "rewrite_seconds": float (if history was used),
+            "standalone_question": str (if history was used),
         }
     """
     start_time = time.perf_counter()
     effective_top_k = top_k if top_k is not None else settings.top_k
+    has_history = bool(history)
 
     # 1. Check if vector store has any indexed documents
     vm = vector_store_manager or get_vector_store_manager()
     stats = vm.get_stats()
     if stats.get("chunks", 0) == 0:
         elapsed = round(time.perf_counter() - start_time, 2)
-        return {
+        res = {
             "answer": "No documents are currently indexed. Please upload or index a PDF first.",
             "sources": [],
             "retrieved": [],
@@ -194,16 +237,40 @@ def answer_question(
             "retrieval_seconds": 0.0,
             "llm_seconds": 0.0,
         }
+        if has_history:
+            res["standalone_question"] = question
+            res["rewrite_seconds"] = 0.0
+        return res
 
-    # 2. Retrieve relevant context chunks with timing
+    model = chat_model or get_chat_model()
+
+    # 2. When history is non-empty, rewrite follow-up question into standalone question
+    standalone_question = question
+    rewrite_seconds = 0.0
+    if has_history:
+        rewrite_prompt = build_rewrite_prompt(question, history)
+        rewrite_start = time.perf_counter()
+        try:
+            raw_rewritten = call_chat_model_with_retry(model, rewrite_prompt)
+            cleaned_rewritten = raw_rewritten.strip().strip('"\'')
+            if cleaned_rewritten:
+                standalone_question = cleaned_rewritten
+        except Exception as exc:
+            logger.warning(
+                "Question rewrite failed (%s). Falling back to original question.", exc
+            )
+            standalone_question = question
+        rewrite_seconds = round(time.perf_counter() - rewrite_start, 2)
+
+    # 3. Retrieve relevant context chunks using rewritten question with timing
     search_func = vm.search if vector_store_manager else search
     retrieval_start = time.perf_counter()
-    chunks = search_func(question, k=effective_top_k)
+    chunks = search_func(standalone_question, k=effective_top_k)
     retrieval_seconds = round(time.perf_counter() - retrieval_start, 2)
 
     if not chunks:
         elapsed = round(time.perf_counter() - start_time, 2)
-        return {
+        res = {
             "answer": "I don't know. No relevant information was found in the indexed documents.",
             "sources": [],
             "retrieved": [],
@@ -211,6 +278,10 @@ def answer_question(
             "retrieval_seconds": retrieval_seconds,
             "llm_seconds": 0.0,
         }
+        if has_history:
+            res["standalone_question"] = standalone_question
+            res["rewrite_seconds"] = rewrite_seconds
+        return res
 
     # List of EVERY chunk retrieved and sent to the LLM
     retrieved = [
@@ -221,11 +292,10 @@ def answer_question(
         for chunk in chunks
     ]
 
-    # 3. Build strict RAG prompt
-    prompt = build_rag_prompt(question, chunks)
+    # 4. Build strict RAG prompt with recent history and context
+    prompt = build_rag_prompt(standalone_question, chunks, history=history)
 
-    # 4. Invoke chat model with retry and timing
-    model = chat_model or get_chat_model()
+    # 5. Invoke chat model with retry and timing
     llm_start = time.perf_counter()
     raw_answer = call_chat_model_with_retry(model, prompt)
     llm_seconds = round(time.perf_counter() - llm_start, 2)
@@ -259,7 +329,7 @@ def answer_question(
         sources = []
 
     elapsed = round(time.perf_counter() - start_time, 2)
-    return {
+    response_payload = {
         "answer": clean_answer,
         "sources": sources,
         "retrieved": retrieved,
@@ -267,3 +337,7 @@ def answer_question(
         "retrieval_seconds": retrieval_seconds,
         "llm_seconds": llm_seconds,
     }
+    if has_history:
+        response_payload["standalone_question"] = standalone_question
+        response_payload["rewrite_seconds"] = rewrite_seconds
+    return response_payload

@@ -3,6 +3,42 @@ import { askQuestion, clearIndex, getStats, uploadPdf } from './api';
 import ChatWindow from './components/ChatWindow';
 import Sidebar from './components/Sidebar';
 
+function isDontKnowAnswer(answer) {
+  if (!answer) return false;
+  const lower = answer.toLowerCase();
+  return (
+    lower.includes("don't know") ||
+    lower.includes("dont know") ||
+    lower.includes("do not know") ||
+    lower.includes("not mentioned in the context") ||
+    lower.includes("not provided in the context") ||
+    lower.includes("not found in the context") ||
+    lower.includes("no information") ||
+    lower.includes("no relevant information") ||
+    lower.includes("context does not contain") ||
+    lower.includes("context does not mention") ||
+    lower.includes("no documents are currently indexed")
+  );
+}
+
+function extractRecentHistory(messages, limit = 3) {
+  const turns = [];
+  for (let i = 0; i < messages.length - 1; i++) {
+    const current = messages[i];
+    const next = messages[i + 1];
+    if (current.role === 'user' && next.role === 'assistant') {
+      if (next.isError) continue;
+      if (isDontKnowAnswer(next.content)) continue;
+      if (!current.content || !next.content) continue;
+      turns.push({
+        question: current.content,
+        answer: next.content,
+      });
+    }
+  }
+  return turns.slice(-limit);
+}
+
 export default function App() {
   const [stats, setStats] = useState({
     documents: 0,
@@ -119,9 +155,15 @@ export default function App() {
     }
   };
 
+  const handleNewChat = () => {
+    setMessages([]);
+  };
+
   const handleSendMessage = async (question) => {
     const trimmed = question.trim();
     if (!trimmed || isThinking) return;
+
+    const recentHistory = extractRecentHistory(messages, 3);
 
     const userMessage = {
       id: `user-${Date.now()}`,
@@ -133,7 +175,7 @@ export default function App() {
     setIsThinking(true);
 
     try {
-      const response = await askQuestion(trimmed);
+      const response = await askQuestion(trimmed, recentHistory);
       const assistantMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
@@ -143,7 +185,9 @@ export default function App() {
           response_time_seconds: response.response_time_seconds,
           retrieval_seconds: response.retrieval_seconds,
           llm_seconds: response.llm_seconds,
+          rewrite_seconds: response.rewrite_seconds,
         },
+        standalone_question: response.standalone_question,
         isError: false,
       };
       setMessages((prev) => [...prev, assistantMessage]);
@@ -192,27 +236,52 @@ export default function App() {
           </p>
         </div>
 
-        {/* Mobile Raised "Documents (N)" Button in Navy Header */}
-        <button
-          type="button"
-          className="mobile-raised-docs-btn"
-          onClick={() => setIsOpenMobileSidebar(true)}
-          aria-label={`Open documents panel (${docCount} indexed)`}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            width="18"
-            height="18"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden="true"
+        {/* Header Action Buttons */}
+        <div className="header-actions">
+          <button
+            type="button"
+            className="btn-new-chat"
+            onClick={handleNewChat}
+            aria-label="Start a new chat conversation"
           >
-            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
-          </svg>
-          <span>Documents</span>
-          <span className="mobile-docs-badge">{docCount}</span>
-        </button>
+            <svg
+              viewBox="0 0 24 24"
+              width="15"
+              height="15"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            <span>New chat</span>
+          </button>
+
+          {/* Mobile Raised "Documents (N)" Button in Navy Header */}
+          <button
+            type="button"
+            className="mobile-raised-docs-btn"
+            onClick={() => setIsOpenMobileSidebar(true)}
+            aria-label={`Open documents panel (${docCount} indexed)`}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
+              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+            </svg>
+            <span>Documents</span>
+            <span className="mobile-docs-badge">{docCount}</span>
+          </button>
+        </div>
       </header>
 
       {/* Main Two-Column Layout */}
