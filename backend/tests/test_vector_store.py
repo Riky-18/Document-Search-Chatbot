@@ -258,3 +258,52 @@ def test_is_retryable_error_identification() -> None:
     assert is_retryable_error(RuntimeError("500 Internal Server Error")) is True
     assert is_retryable_error(RuntimeError("RESOURCE_EXHAUSTED: quota exceeded")) is True
     assert is_retryable_error(ValueError("Invalid syntax")) is False
+
+
+def test_delete_document_success(manager: VectorStoreManager) -> None:
+    """Verify delete_document removes matching chunks and updates stats."""
+    from app.vector_store import DocumentNotFoundError
+    chunks = [
+        {"text": "A1", "file_name": "docA.pdf", "page_number": 1, "chunk_index": 0},
+        {"text": "A2", "file_name": "docA.pdf", "page_number": 2, "chunk_index": 1},
+        {"text": "B1", "file_name": "docB.pdf", "page_number": 1, "chunk_index": 0},
+    ]
+    manager.add_chunks(chunks)
+
+    res = manager.delete_document("docA.pdf")
+    assert res == {"file_name": "docA.pdf", "chunks_removed": 2, "pages_removed": 2}
+
+    stats = manager.get_stats()
+    assert stats["documents"] == 1
+    assert stats["pages"] == 1
+    assert stats["chunks"] == 1
+    assert manager.get_indexed_files() == {"docB.pdf"}
+
+    # Deleting an unindexed document raises DocumentNotFoundError
+    with pytest.raises(DocumentNotFoundError):
+        manager.delete_document("docA.pdf")
+
+
+def test_delete_document_rebuild_fallback(manager: VectorStoreManager, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify delete_document falls back to rebuilding index if store.delete raises exception."""
+    chunks = [
+        {"text": "A1", "file_name": "docA.pdf", "page_number": 1, "chunk_index": 0},
+        {"text": "B1", "file_name": "docB.pdf", "page_number": 1, "chunk_index": 0},
+    ]
+    manager.add_chunks(chunks)
+    assert manager._store is not None
+
+    def _failing_delete(*args, **kwargs):
+        raise NotImplementedError("Index delete not supported")
+
+    monkeypatch.setattr(manager._store, "delete", _failing_delete)
+
+    res = manager.delete_document("docA.pdf")
+    assert res["file_name"] == "docA.pdf"
+    assert res["chunks_removed"] == 1
+
+    stats = manager.get_stats()
+    assert stats["documents"] == 1
+    assert stats["chunks"] == 1
+    assert manager.get_indexed_files() == {"docB.pdf"}
+

@@ -6,7 +6,9 @@ from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
 import tempfile
+import threading
 from typing import Any
+from urllib.parse import unquote
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +19,10 @@ from app.config import settings
 from app.pdf_reader import PdfReadError, ScannedPdfError, extract_pages
 from app.rag import answer_question
 from app.vector_store import (
+    DocumentNotFoundError,
     add_chunks,
+    delete_document,
+    get_documents,
     get_indexed_files,
     get_stats,
     is_file_indexed,
@@ -108,6 +113,22 @@ class ClearResponse(BaseModel):
     message: str = Field(description="Confirmation message")
 
 
+class DocumentItem(BaseModel):
+    file_name: str = Field(description="Name of the indexed document")
+    pages: int = Field(description="Total readable pages indexed")
+    chunks: int = Field(description="Total chunks generated for this document")
+
+
+class DocumentDeleteResponse(BaseModel):
+    file_name: str = Field(description="Name of the deleted PDF document")
+    chunks_removed: int = Field(description="Total chunks removed from the vector store")
+    pages_removed: int = Field(description="Total pages removed")
+
+
+# Shared thread lock to guarantee safe concurrent modifications to the vector store
+store_lock = threading.Lock()
+
+
 @app.get("/health", response_model=HealthResponse, tags=["System"])
 def health() -> dict[str, str]:
     """Health check endpoint for deployment monitoring."""
@@ -117,8 +138,9 @@ def health() -> dict[str, str]:
 @app.get("/stats", response_model=StatsResponse, tags=["Vector Store"])
 def stats() -> dict[str, Any]:
     """Return index statistics and list of indexed file names."""
-    index_stats = get_stats()
-    indexed_files = sorted(list(get_indexed_files()))
+    with store_lock:
+        index_stats = get_stats()
+        indexed_files = sorted(list(get_indexed_files()))
     return {
         "documents": index_stats.get("documents", 0),
         "pages": index_stats.get("pages", 0),
@@ -128,10 +150,37 @@ def stats() -> dict[str, Any]:
     }
 
 
+@app.get("/documents", response_model=list[DocumentItem], tags=["Documents"])
+def list_documents() -> list[dict[str, Any]]:
+    """List all indexed documents with page and chunk counts."""
+    with store_lock:
+        return get_documents()
+
+
+@app.delete("/documents/{file_name:path}", response_model=DocumentDeleteResponse, tags=["Documents"])
+def delete_single_document(file_name: str) -> dict[str, Any]:
+    """Delete a single document by its file name (URL-decoded)."""
+    decoded_file_name = unquote(file_name).strip()
+    if not decoded_file_name:
+        raise HTTPException(status_code=400, detail="Invalid or empty file name provided.")
+
+    with store_lock:
+        try:
+            result = delete_document(decoded_file_name)
+        except DocumentNotFoundError:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Document '{decoded_file_name}' not found.",
+            )
+
+    return result
+
+
 @app.post("/clear", response_model=ClearResponse, tags=["Vector Store"])
 def clear() -> dict[str, str]:
     """Clear the vector store index and remove persisted disk files."""
-    reset()
+    with store_lock:
+        reset()
     return {
         "status": "ok",
         "message": "Vector store index has been reset and cleared.",
@@ -158,11 +207,12 @@ def upload(file: UploadFile = File(...)) -> dict[str, Any]:
         )
 
     # Check for duplicate file
-    if is_file_indexed(filename):
-        raise HTTPException(
-            status_code=409,
-            detail=f"Document '{filename}' is already indexed. Use /clear first if you wish to re-index it.",
-        )
+    with store_lock:
+        if is_file_indexed(filename):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Document '{filename}' is already indexed. Use /clear first if you wish to re-index it.",
+            )
 
     # Stream file into temporary file and enforce 20 MB size limit
     temp_file = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
@@ -188,8 +238,9 @@ def upload(file: UploadFile = File(...)) -> dict[str, Any]:
         # Process the PDF
         pages = extract_pages(temp_path)
         chunks = chunk_pages(pages, file_name=filename)
-        add_chunks(chunks)
-        save()
+        with store_lock:
+            add_chunks(chunks)
+            save()
 
         return {
             "file_name": filename,

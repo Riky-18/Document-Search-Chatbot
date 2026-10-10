@@ -588,6 +588,167 @@ div[tabindex]:focus-visible,
   color: var(--color-text-secondary);
 }
 
+/* Remove button on file card (min 44px touch target) */
+.btn-card-remove {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-base);
+  box-shadow: 2px 2px 6px #C9D3E0, -2px -2px 6px #FFFFFF;
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.btn-card-remove:hover:not(:disabled) {
+  color: var(--color-error);
+  box-shadow: 3px 3px 8px #C9D3E0, -3px -3px 8px #FFFFFF;
+  transform: translateY(-1px);
+}
+
+.btn-card-remove:active:not(:disabled) {
+  box-shadow: var(--shadow-inset);
+  transform: translateY(0);
+}
+
+.btn-card-remove:focus-visible {
+  outline: 2px solid var(--color-navy);
+  outline-offset: 2px;
+}
+
+.btn-card-remove:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Inline Confirmation State for Single File Deletion */
+.doc-card-confirming {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  background-color: var(--color-base);
+}
+
+.doc-card-confirm-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.doc-card-confirm-prompt {
+  font-size: 0.84rem;
+  color: var(--color-text-main);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.doc-card-confirm-prompt strong {
+  color: var(--color-navy);
+  font-weight: 600;
+}
+
+.doc-card-error-text {
+  font-size: 0.78rem;
+  color: var(--color-error);
+  line-height: 1.3;
+  padding: 4px 8px;
+  background-color: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-sm);
+  word-break: break-word;
+}
+
+.doc-card-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-card-delete-confirm {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-error);
+  color: #FFFFFF;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 2px 2px 6px rgba(220, 38, 38, 0.35);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.btn-card-delete-confirm:hover:not(:disabled) {
+  background-color: #B91C1C;
+  transform: translateY(-1px);
+}
+
+.btn-card-delete-confirm:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-card-delete-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-card-delete-cancel {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-base);
+  box-shadow: 2px 2px 6px #C9D3E0, -2px -2px 6px #FFFFFF;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.btn-card-delete-cancel:hover:not(:disabled) {
+  color: var(--color-text-main);
+  box-shadow: 3px 3px 8px #C9D3E0, -3px -3px 8px #FFFFFF;
+  transform: translateY(-1px);
+}
+
+.btn-card-delete-cancel:active:not(:disabled) {
+  box-shadow: var(--shadow-inset);
+  transform: translateY(0);
+}
+
+.btn-card-delete-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
 /* ==========================================================================
    Sidebar Footer: Inset Stats Line & Navy Clear Confirmation Button
    ========================================================================== */

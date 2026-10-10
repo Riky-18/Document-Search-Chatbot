@@ -49,6 +49,8 @@ def setup_test_backend(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.main.save", isolated_manager.save)
     monkeypatch.setattr("app.main.load", isolated_manager.load)
     monkeypatch.setattr("app.main.reset", isolated_manager.reset)
+    monkeypatch.setattr("app.main.delete_document", isolated_manager.delete_document)
+    monkeypatch.setattr("app.main.get_documents", isolated_manager.get_documents)
 
     # Mock chat model
     mock_chat = MockChatModel()
@@ -196,3 +198,109 @@ def test_stats_and_clear(client: TestClient) -> None:
     assert empty_stats["chunks"] == 0
     assert empty_stats["files"] == []
     assert empty_stats["top_k"] == 4
+
+
+def test_delete_document_end_to_end(client: TestClient) -> None:
+    """Upload two PDFs, delete one, assert /stats drop, assert chunks never appear in /ask sources."""
+    # 1. Upload two PDFs
+    pdf1 = build_simple_pdf(["Alpha content on page one.", "Alpha content on page two."])
+    pdf2 = build_simple_pdf(["Beta content on single page."])
+
+    resp1 = client.post("/upload", files={"file": ("alpha doc.pdf", io.BytesIO(pdf1), "application/pdf")})
+    assert resp1.status_code == 200
+    resp2 = client.post("/upload", files={"file": ("beta.pdf", io.BytesIO(pdf2), "application/pdf")})
+    assert resp2.status_code == 200
+
+    # 2. Check stats: 2 documents, 3 pages, 3 chunks
+    stats = client.get("/stats").json()
+    assert stats["documents"] == 2
+    assert stats["pages"] == 3
+    assert stats["chunks"] == 3
+    assert sorted(stats["files"]) == ["alpha doc.pdf", "beta.pdf"]
+
+    # Check GET /documents
+    docs_resp = client.get("/documents")
+    assert docs_resp.status_code == 200
+    docs = docs_resp.json()
+    assert len(docs) == 2
+    assert {"file_name": "alpha doc.pdf", "pages": 2, "chunks": 2} in docs
+    assert {"file_name": "beta.pdf", "pages": 1, "chunks": 1} in docs
+
+    # 3. Delete 'alpha doc.pdf' (with space in name)
+    del_resp = client.delete("/documents/alpha%20doc.pdf")
+    assert del_resp.status_code == 200
+    del_data = del_resp.json()
+    assert del_data["file_name"] == "alpha doc.pdf"
+    assert del_data["chunks_removed"] == 2
+    assert del_data["pages_removed"] == 2
+
+    # 4. Check stats: counts drop correctly
+    stats_after = client.get("/stats").json()
+    assert stats_after["documents"] == 1
+    assert stats_after["pages"] == 1
+    assert stats_after["chunks"] == 1
+    assert stats_after["files"] == ["beta.pdf"]
+
+    # 5. Assert deleted file's chunks never appear in /ask sources or retrieved
+    ask_resp = client.post("/ask", json={"question": "What is in alpha content?"})
+    assert ask_resp.status_code == 200
+    ask_data = ask_resp.json()
+    source_files = [s["file_name"] for s in ask_data["sources"]]
+    retrieved_files = [r["file_name"] for r in ask_data["retrieved"]]
+    assert "alpha doc.pdf" not in source_files
+    assert "alpha doc.pdf" not in retrieved_files
+
+
+def test_delete_unknown_document_returns_404(client: TestClient) -> None:
+    """DELETE /documents/{file_name} returns 404 if file is not indexed."""
+    resp = client.delete("/documents/non_existent.pdf")
+    assert resp.status_code == 404
+    assert "not found" in resp.json()["detail"].lower()
+
+
+def test_delete_last_document_leaves_clean_empty_state(client: TestClient) -> None:
+    """Deleting the last file leaves the store in the same clean empty state as /clear."""
+    pdf = build_simple_pdf(["Sole document text."])
+    client.post("/upload", files={"file": ("sole.pdf", io.BytesIO(pdf), "application/pdf")})
+
+    del_resp = client.delete("/documents/sole.pdf")
+    assert del_resp.status_code == 200
+
+    # Stats show 0 documents
+    stats = client.get("/stats").json()
+    assert stats["documents"] == 0
+    assert stats["pages"] == 0
+    assert stats["chunks"] == 0
+    assert stats["files"] == []
+
+    # Documents list is empty
+    assert client.get("/documents").json() == []
+
+    # /ask returns the exact 'nothing indexed' response
+    ask_resp = client.post("/ask", json={"question": "Any question?"})
+    assert ask_resp.status_code == 200
+    assert "No documents are currently indexed" in ask_resp.json()["answer"]
+    assert ask_resp.json()["sources"] == []
+
+
+def test_index_survives_reload_after_deletion(client: TestClient, tmp_path: Path) -> None:
+    """Index survives a reload from disk after a document deletion."""
+    import app.vector_store
+    pdf1 = build_simple_pdf(["First doc text."])
+    pdf2 = build_simple_pdf(["Second doc text."])
+
+    client.post("/upload", files={"file": ("doc1.pdf", io.BytesIO(pdf1), "application/pdf")})
+    client.post("/upload", files={"file": ("doc2.pdf", io.BytesIO(pdf2), "application/pdf")})
+
+    client.delete("/documents/doc1.pdf")
+
+    # Force a fresh load from disk using the isolated manager's folder
+    mgr = app.vector_store._default_manager
+    assert mgr is not None
+    loaded = mgr.load()
+    assert loaded is True
+
+    stats = mgr.get_stats()
+    assert stats["documents"] == 1
+    assert stats["chunks"] == 1
+    assert mgr.get_indexed_files() == {"doc2.pdf"}

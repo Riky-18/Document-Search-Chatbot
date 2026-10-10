@@ -55,6 +55,11 @@ def is_retryable_error(exc: Exception) -> bool:
     )
 
 
+class DocumentNotFoundError(Exception):
+    """Raised when attempting to delete a document that is not in the vector store."""
+    pass
+
+
 class VectorStoreManager:
     """Manages indexing, searching, persistence, and stats for FAISS vector store."""
 
@@ -214,6 +219,45 @@ class VectorStoreManager:
         """Check whether a specific file name has already been indexed."""
         return file_name in self.get_indexed_files()
 
+    def get_documents(self) -> list[dict[str, Any]]:
+        """Return list of indexed documents with file_name, pages, and chunk counts."""
+        if self._store is None:
+            self.load()
+
+        if self._store is None:
+            return []
+
+        docstore = getattr(self._store, "docstore", None)
+        if not docstore or not hasattr(docstore, "_dict"):
+            return []
+
+        docs_map: dict[str, dict[str, Any]] = {}
+        for doc in docstore._dict.values():
+            file_name = doc.metadata.get("file_name")
+            if not file_name:
+                continue
+            if file_name not in docs_map:
+                docs_map[file_name] = {
+                    "file_name": file_name,
+                    "pages": set(),
+                    "chunks": 0,
+                }
+            docs_map[file_name]["chunks"] += 1
+            page_num = doc.metadata.get("page_number")
+            if page_num is not None:
+                docs_map[file_name]["pages"].add(page_num)
+
+        result = [
+            {
+                "file_name": name,
+                "pages": len(info["pages"]),
+                "chunks": info["chunks"],
+            }
+            for name, info in docs_map.items()
+        ]
+        result.sort(key=lambda d: d["file_name"])
+        return result
+
     def get_stats(self) -> dict[str, int]:
         """Return the number of documents, unique pages, and chunks in the vector store."""
         if self._store is None:
@@ -243,6 +287,77 @@ class VectorStoreManager:
             "documents": len(unique_files),
             "pages": len(unique_pages),
             "chunks": chunk_count,
+        }
+
+    def delete_document(self, file_name: str) -> dict[str, Any]:
+        """Delete all chunks for a given file_name from the vector store and persist the update.
+
+        Args:
+            file_name: The exact file name to remove.
+
+        Returns:
+            dict: {"file_name": str, "chunks_removed": int, "pages_removed": int}
+
+        Raises:
+            DocumentNotFoundError: If no chunks match the given file_name.
+        """
+        if self._store is None:
+            self.load()
+
+        if self._store is None:
+            raise DocumentNotFoundError(f"Document '{file_name}' not found in the vector store.")
+
+        docstore = getattr(self._store, "docstore", None)
+        if not docstore or not hasattr(docstore, "_dict"):
+            raise DocumentNotFoundError(f"Document '{file_name}' not found in the vector store.")
+
+        matching_chunk_ids: list[str] = []
+        matching_pages: set[int] = set()
+
+        for chunk_id, doc in list(docstore._dict.items()):
+            if doc.metadata.get("file_name") == file_name:
+                matching_chunk_ids.append(chunk_id)
+                page_num = doc.metadata.get("page_number")
+                if page_num is not None:
+                    matching_pages.add(page_num)
+
+        if not matching_chunk_ids:
+            raise DocumentNotFoundError(f"Document '{file_name}' not found in the vector store.")
+
+        chunks_removed = len(matching_chunk_ids)
+        pages_removed = len(matching_pages)
+        total_chunks = len(docstore._dict)
+
+        # If all documents/chunks are removed, reset store to clean empty state
+        if chunks_removed >= total_chunks:
+            self.reset()
+            logger.info("Deleted last document '%s'. Vector store reset to clean empty state.", file_name)
+        else:
+            try:
+                self._store.delete(ids=matching_chunk_ids)
+            except Exception as exc:
+                logger.warning("FAISS delete(ids=...) failed (%s). Rebuilding index from remaining chunks.", exc)
+                # Fallback: rebuild index from remaining chunks
+                remaining_chunks = [
+                    {
+                        "text": doc.page_content,
+                        "file_name": doc.metadata.get("file_name", "unknown"),
+                        "page_number": doc.metadata.get("page_number", 0),
+                        "chunk_index": doc.metadata.get("chunk_index", 0),
+                    }
+                    for cid, doc in docstore._dict.items()
+                    if cid not in matching_chunk_ids
+                ]
+                self._store = None
+                self.add_chunks(remaining_chunks)
+
+            self.save()
+            logger.info("Deleted document '%s' (%d chunks, %d pages). Updated index saved.", file_name, chunks_removed, pages_removed)
+
+        return {
+            "file_name": file_name,
+            "chunks_removed": chunks_removed,
+            "pages_removed": pages_removed,
         }
 
     def save(self, folder_path: str | Path | None = None) -> bool:
@@ -362,3 +477,13 @@ def load(folder_path: str | Path | None = None) -> bool:
 def reset(folder_path: str | Path | None = None) -> None:
     """Reset and delete files from the default vector store."""
     get_vector_store_manager().reset(folder_path)
+
+
+def delete_document(file_name: str) -> dict[str, Any]:
+    """Delete all chunks for a document from the default vector store."""
+    return get_vector_store_manager().delete_document(file_name)
+
+
+def get_documents() -> list[dict[str, Any]]:
+    """Return list of indexed documents with file_name, pages, and chunk counts."""
+    return get_vector_store_manager().get_documents()

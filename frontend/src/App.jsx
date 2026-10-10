@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { askQuestion, clearIndex, getStats, uploadPdf } from './api';
+import { askQuestion, clearIndex, deleteDocument, getDocuments, getStats, uploadPdf } from './api';
 import ChatWindow from './components/ChatWindow';
 import Sidebar from './components/Sidebar';
 
@@ -62,13 +62,20 @@ export default function App() {
 
   const fetchStats = async () => {
     try {
-      const data = await getStats();
+      const [data, docs] = await Promise.all([getStats(), getDocuments()]);
       setStats({
         documents: data.documents || 0,
         pages: data.pages || 0,
         chunks: data.chunks || 0,
         files: Array.isArray(data.files) ? data.files : [],
       });
+      if (Array.isArray(docs)) {
+        const pageMap = {};
+        docs.forEach((doc) => {
+          pageMap[doc.file_name] = doc.pages;
+        });
+        setFilePageCounts((prev) => ({ ...prev, ...pageMap }));
+      }
     } catch (err) {
       setStatus({
         type: 'error',
@@ -152,6 +159,33 @@ export default function App() {
       });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteDocument = async (fileName) => {
+    try {
+      const result = await deleteDocument(fileName);
+      setStatus({
+        type: 'done',
+        message: `Removed "${result.file_name}" (${result.pages_removed} page${
+          result.pages_removed === 1 ? '' : 's'
+        }, ${result.chunks_removed} chunk${result.chunks_removed === 1 ? '' : 's'}).`,
+        details: result,
+      });
+      setFilePageCounts((prev) => {
+        const next = { ...prev };
+        delete next[fileName];
+        return next;
+      });
+      await fetchStats();
+      return result;
+    } catch (err) {
+      setStatus({
+        type: 'error',
+        message: `Failed to remove "${fileName}": ${err.message}`,
+        details: null,
+      });
+      throw err;
     }
   };
 
@@ -300,6 +334,7 @@ export default function App() {
           isProcessing={isProcessing}
           onFileSelect={handleFileSelect}
           onClear={handleClear}
+          onDeleteDocument={handleDeleteDocument}
           filePageCounts={filePageCounts}
           isOpenMobile={isOpenMobileSidebar}
           onCloseMobile={() => setIsOpenMobileSidebar(false)}

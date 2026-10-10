@@ -105,3 +105,24 @@ export async function clearIndex() {
     method: 'POST',
   });
 }
+
+/**
+ * Get detailed list of indexed documents with page and chunk counts.
+ * @returns {Promise<Array<{file_name: string, pages: number, chunks: number}>>}
+ */
+export async function getDocuments() {
+  return request('/documents', {
+    method: 'GET',
+  });
+}
+
+/**
+ * Remove a single indexed document from the vector store.
+ * @param {string} fileName
+ * @returns {Promise<{file_name: string, chunks_removed: number, pages_removed: number}>}
+ */
+export async function deleteDocument(fileName) {
+  return request(`/documents/${encodeURIComponent(fileName)}`, {
+    method: 'DELETE',
+  });
+}

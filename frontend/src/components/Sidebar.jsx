@@ -11,11 +11,15 @@ export default function Sidebar({
   isProcessing,
   onFileSelect,
   onClear,
+  onDeleteDocument,
   filePageCounts = {},
   isOpenMobile,
   onCloseMobile,
 }) {
   const [isConfirmingClear, setIsConfirmingClear] = useState(false);
+  const [confirmingFile, setConfirmingFile] = useState(null);
+  const [deletingFile, setDeletingFile] = useState(null);
+  const [cardError, setCardError] = useState(null);
   const hasFiles = stats.files && stats.files.length > 0;
 
   const docCount = stats.documents ?? stats.files?.length ?? 0;
@@ -27,7 +31,7 @@ export default function Sidebar({
   } · ${chunkCount} chunk${chunkCount === 1 ? '' : 's'}`;
 
   const handleStartClear = () => {
-    if (!hasFiles || isProcessing) return;
+    if (!hasFiles || isProcessing || deletingFile) return;
     setIsConfirmingClear(true);
   };
 
@@ -38,6 +42,31 @@ export default function Sidebar({
 
   const handleCancelClear = () => {
     setIsConfirmingClear(false);
+  };
+
+  const handleRequestDelete = (fileName) => {
+    if (isProcessing || deletingFile) return;
+    setCardError(null);
+    setConfirmingFile(fileName);
+  };
+
+  const handleCancelDelete = () => {
+    setConfirmingFile(null);
+    setCardError(null);
+  };
+
+  const handleConfirmDelete = async (fileName) => {
+    if (deletingFile || !onDeleteDocument) return;
+    setDeletingFile(fileName);
+    setCardError(null);
+    try {
+      await onDeleteDocument(fileName);
+      setConfirmingFile(null);
+    } catch (err) {
+      setCardError({ fileName, message: err.message || 'Failed to remove document' });
+    } finally {
+      setDeletingFile(null);
+    }
   };
 
   return (
@@ -109,6 +138,59 @@ export default function Sidebar({
             <ul className="doc-cards-list" aria-label="List of indexed files">
               {stats.files.map((fileName) => {
                 const pages = filePageCounts[fileName];
+                const isConfirming = confirmingFile === fileName;
+                const isRowDeleting = deletingFile === fileName;
+                const hasError = cardError && cardError.fileName === fileName;
+
+                if (isConfirming) {
+                  return (
+                    <li
+                      key={fileName}
+                      className="doc-card doc-card-confirming"
+                      role="region"
+                      aria-label={`Confirm removing ${fileName}`}
+                    >
+                      <div className="doc-card-confirm-content">
+                        <span className="doc-card-confirm-prompt">
+                          Remove <strong>{fileName}</strong>? This can&apos;t be undone.
+                        </span>
+                        {hasError && (
+                          <div className="doc-card-error-text" role="alert">
+                            {cardError.message}
+                          </div>
+                        )}
+                        <div className="doc-card-confirm-actions">
+                          <button
+                            type="button"
+                            className="btn-card-delete-confirm"
+                            onClick={() => handleConfirmDelete(fileName)}
+                            disabled={Boolean(deletingFile)}
+                            aria-label={`Confirm removing ${fileName}`}
+                          >
+                            {isRowDeleting ? (
+                              <>
+                                <span className="btn-spinner" aria-hidden="true" />
+                                <span>Removing...</span>
+                              </>
+                            ) : (
+                              'Remove'
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-card-delete-cancel"
+                            onClick={handleCancelDelete}
+                            disabled={Boolean(deletingFile)}
+                            aria-label={`Cancel removing ${fileName}`}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                }
+
                 return (
                   <li key={fileName} className="doc-card" title={fileName}>
                     <div className="doc-card-icon-wrapper" aria-hidden="true">
@@ -129,6 +211,32 @@ export default function Sidebar({
                         </span>
                       )}
                     </div>
+
+                    <button
+                      type="button"
+                      className="btn-card-remove"
+                      onClick={() => handleRequestDelete(fileName)}
+                      disabled={isProcessing || Boolean(deletingFile)}
+                      aria-label={`Remove ${fileName}`}
+                      title={`Remove ${fileName}`}
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
+                      </svg>
+                    </button>
                   </li>
                 );
               })}
