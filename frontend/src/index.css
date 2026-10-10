@@ -77,9 +77,16 @@
 }
 
 html,
+body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+html,
 body,
 #root {
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   width: 100%;
   overflow: hidden;
   background-color: var(--color-base);
@@ -121,7 +128,9 @@ div[tabindex]:focus-visible,
   display: flex;
   flex-direction: column;
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
+  max-width: 100%;
   overflow: hidden;
   background-color: var(--color-base);
 }
@@ -723,6 +732,7 @@ div[tabindex]:focus-visible,
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   background-color: var(--color-base);
   position: relative;
   overflow: hidden;
@@ -731,6 +741,7 @@ div[tabindex]:focus-visible,
 /* Scroll Area for Messages */
 .chat-scroll-area {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 24px 28px;
   display: flex;
@@ -765,6 +776,14 @@ div[tabindex]:focus-visible,
   align-items: center;
   padding: 40px 16px;
   gap: 18px;
+}
+
+.empty-mobile-subtitle {
+  display: none;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  margin-bottom: 4px;
 }
 
 .empty-state-icon-wrapper {
@@ -875,6 +894,7 @@ div[tabindex]:focus-visible,
   border-bottom-right-radius: 4px;
   box-shadow: var(--shadow-navy);
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* Bot Message Bubble: Raised Neumorphic Card (Radius 16px) */
@@ -890,6 +910,7 @@ div[tabindex]:focus-visible,
   flex-direction: column;
   gap: 12px;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .message-text {
@@ -897,6 +918,7 @@ div[tabindex]:focus-visible,
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* Sources Pills: Small Raised Pills */
@@ -935,6 +957,7 @@ div[tabindex]:focus-visible,
   border: 1px solid #D5DCE8;
   color: var(--color-navy);
   transition: all var(--transition-fast);
+  max-width: 100%;
 }
 
 .source-badge:hover {
@@ -951,6 +974,9 @@ div[tabindex]:focus-visible,
 
 .source-text {
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
 }
 
 /* Response Timing */
@@ -1214,18 +1240,6 @@ div[tabindex]:focus-visible,
 }
 
 @media (max-width: 768px) {
-  .top-header-bar {
-    padding: 10px 16px;
-  }
-
-  .header-title {
-    font-size: 1.15rem;
-  }
-
-  .header-subtitle {
-    font-size: 0.78rem;
-  }
-
   .mobile-raised-docs-btn {
     display: inline-flex;
   }
@@ -1235,8 +1249,10 @@ div[tabindex]:focus-visible,
     top: 0;
     left: 0;
     bottom: 0;
-    width: 85%;
-    max-width: 320px;
+    height: 100vh;
+    height: 100dvh;
+    width: min(88vw, 340px);
+    max-width: 340px;
     box-shadow: 10px 0 25px rgba(0, 0, 0, 0.2);
     transform: translateX(-100%);
     border-right: none;
@@ -1258,20 +1274,191 @@ div[tabindex]:focus-visible,
     backdrop-filter: blur(3px);
     z-index: 15;
   }
+}
 
-  .chat-scroll-area {
-    padding: 16px;
+/* ==========================================================================
+   Mobile Layout (Screens Under 600px Wide)
+   ========================================================================== */
+
+@media (max-width: 600px) {
+  .top-header-bar {
+    height: 56px;
+    min-height: 56px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    box-sizing: border-box;
   }
 
-  .chat-input-container {
-    padding: 10px 14px 16px;
-    background-color: var(--color-base);
-    border-top: 1px solid #D5DCE8;
+  .header-brand-block {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .header-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .header-brand-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  .header-title {
+    font-size: 18px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+
+  /* Subtitle hidden from header on mobile */
+  .header-subtitle {
+    display: none;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .btn-new-chat {
+    min-height: 38px;
+    padding: 0 10px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    gap: 4px;
+    border-radius: var(--radius-sm);
+  }
+
+  .mobile-raised-docs-btn {
+    display: inline-flex;
+    min-height: 38px;
+    padding: 0 10px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    gap: 5px;
+    border-radius: var(--radius-sm);
+  }
+
+  .mobile-docs-badge {
+    font-size: 0.72rem;
+    padding: 1px 6px;
+  }
+
+  /* Empty State subtitle visible on mobile */
+  .empty-mobile-subtitle {
+    display: block;
+    font-size: 0.82rem;
+    color: var(--color-text-secondary);
+    text-align: center;
+    max-width: 290px;
+    line-height: 1.4;
+    margin-bottom: 2px;
+  }
+
+  .chat-scroll-area {
+    padding: 12px 14px;
   }
 
   .bubble-user,
   .bubble-bot,
   .bubble-error {
-    max-width: 92%;
+    max-width: 88%;
+    overflow-wrap: anywhere;
+  }
+
+  .bubble-user {
+    padding: 10px 14px;
+    font-size: 0.92rem;
+  }
+
+  .bubble-bot {
+    padding: 12px 14px;
+    font-size: 0.92rem;
+  }
+
+  .source-text {
+    max-width: 140px;
+  }
+
+  /* Chat Input Area pinned at bottom */
+  .chat-input-container {
+    padding: 8px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    background-color: var(--color-base);
+    border-top: 1px solid #D5DCE8;
+  }
+
+  .chat-input-box {
+    padding: 6px 6px 6px 12px;
+    gap: 6px;
+  }
+
+  /* Textarea at least 16px to prevent iOS auto-zoom */
+  .chat-textarea {
+    font-size: 16px;
+    padding: 8px 0;
+    min-height: 24px;
+  }
+
+  .btn-send-navy {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .chat-input-hint {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   Small Mobile (Screens Under 420px Wide, e.g. 375px, 320px)
+   ========================================================================== */
+
+@media (max-width: 420px) {
+  .top-header-bar {
+    padding: 0 8px;
+    gap: 4px;
+  }
+
+  .header-title {
+    font-size: 16px;
+  }
+
+  /* Hide text, show only icon with 44px touch target */
+  .btn-new-chat {
+    padding: 0;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    justify-content: center;
+  }
+
+  .btn-new-chat-text {
+    display: none;
+  }
+
+  .mobile-raised-docs-btn {
+    padding: 0 8px;
+    font-size: 0.76rem;
+  }
+
+  .source-text {
+    max-width: 110px;
   }
 }

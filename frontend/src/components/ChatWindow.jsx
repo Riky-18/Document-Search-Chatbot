@@ -97,6 +97,10 @@ export default function ChatWindow({
               </svg>
             </div>
 
+            <p className="empty-mobile-subtitle">
+              Ask questions about your PDFs. Answers come only from your documents.
+            </p>
+
             {!hasDocuments ? (
               <div className="empty-content">
                 <h2 className="empty-heading">No documents indexed</h2>

@@ -242,7 +242,7 @@ export default function App() {
             type="button"
             className="btn-new-chat"
             onClick={handleNewChat}
-            aria-label="Start a new chat conversation"
+            aria-label="New chat"
           >
             <svg
               viewBox="0 0 24 24"
@@ -257,7 +257,7 @@ export default function App() {
             >
               <path d="M12 5v14M5 12h14" />
             </svg>
-            <span>New chat</span>
+            <span className="btn-new-chat-text">New chat</span>
           </button>
 
           {/* Mobile Raised "Documents (N)" Button in Navy Header */}
